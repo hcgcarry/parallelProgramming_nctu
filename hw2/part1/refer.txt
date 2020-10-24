@@ -1,0 +1,60 @@
+static inline uint32_t rotl(const uint32_t x, int k) {
+	return (x << k) | (x >> (32 - k));
+}
+
+
+static uint32_t s[4];
+
+uint32_t next(void) {
+	const uint32_t result = rotl(s[0] + s[3], 7) + s[0];
+
+	const uint32_t t = s[1] << 9;
+
+	s[2] ^= s[0];
+	s[3] ^= s[1];
+	s[1] ^= s[2];
+	s[0] ^= s[3];
+
+	s[2] ^= t;
+
+	s[3] = rotl(s[3], 11);
+
+	return result;
+}
+void jump(void) {
+	static const uint32_t JUMP[] = { 0x8764000b, 0xf542d2d3, 0x6fa035c3, 0x77f2db5b };
+
+	uint32_t s0 = 0;
+	uint32_t s1 = 0;
+	uint32_t s2 = 0;
+	uint32_t s3 = 0;
+	for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
+		for(int b = 0; b < 32; b++) {
+			if (JUMP[i] & UINT32_C(1) << b) {
+				s0 ^= s[0];
+				s1 ^= s[1];
+				s2 ^= s[2];
+				s3 ^= s[3];
+			}
+			next();	
+		}
+		
+	s[0] = s0;
+	s[1] = s1;
+	s[2] = s2;
+	s[3] = s3;
+}
+
+
+
+__m256i xorshift128plus_avx2_64(__m256i &state0, __m256i &state1)
+{
+    __m256i s1 = state0;
+    const __m256i s0 = state1;
+    state0 = s0;
+    s1 = _mm256_xor_si256(s1, _mm256_slli_epi64(s1, 23));
+    state1 = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(s1, s0),
+                                               _mm256_srli_epi64(s1, 18)),
+                              _mm256_srli_epi64(s0, 5));
+    return _mm256_add_epi64(state1, s0);
+}
