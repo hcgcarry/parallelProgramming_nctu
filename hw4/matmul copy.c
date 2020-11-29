@@ -2,14 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
-#include <immintrin.h>
 
 #include "matmul.h"
 #define MASTER 0      /* taskid of first task */
 #define FROM_MASTER 1 /* setting a message type */
 #define FROM_WORKER 2 /* setting a message type */
-void avx2caculatePartialMatrix(int *a_matrix, int *b_matrix, int *c_matrix, int n, int m, int l);
-void printM256i(__m256i * avxValue);
 
 void construct_matrices(int *n_ptr, int *m_ptr, int *l_ptr,
                         int **a_mat_ptr, int **b_mat_ptr)
@@ -106,8 +103,8 @@ void matrix_multiply(const int n, const int m, const int l,
             offset = offset + workerHandleRows;
         }
         ///////////// caculate matrix
-        //printf("-----------rank %d ,workerHandleRows %d, m %d, l %d------------\n", world_rank,masterWorkerHandleRows,m,l);
-        avx2caculatePartialMatrix((int *)a_mat, (int *)b_mat, (int *)global_c_matrix, masterWorkerHandleRows, m, l);
+        printf("-----------rank %d ,workerHandleRows %d, m %d, l %d------------\n", world_rank,masterWorkerHandleRows,m,l);
+        caculatePartialMatrix((int *)a_mat, (int *)b_mat, (int *)global_c_matrix, masterWorkerHandleRows, m, l);
         /* Receive results from worker tasks */
         MPI_Status status;
         messageType = FROM_WORKER;
@@ -151,8 +148,8 @@ void matrix_multiply(const int n, const int m, const int l,
             printf("workerHandleRows %d ,m %d,l %d,offset %d\n", workerHandleRows, m, l, offset);
             #endif
             /////////// caculate matrix
-            //printf("-----------rank %d ,workerHandleRows %d, m %d, l %d------------\n", world_rank,workerHandleRows,m,l);
-            avx2caculatePartialMatrix(matrix_a, matrix_b, matrix_c, workerHandleRows, m, l);
+            printf("-----------rank %d ,workerHandleRows %d, m %d, l %d------------\n", world_rank,workerHandleRows,m,l);
+            caculatePartialMatrix(matrix_a, matrix_b, matrix_c, workerHandleRows, m, l);
             #ifdef debug
             printf("-------rank %d result:----------\n", world_rank);
             #endif
@@ -184,70 +181,6 @@ void caculatePartialMatrix(int *a_matrix, int *b_matrix, int *c_matrix, int n, i
             c_matrix[i * l + j] = curPosValue;
         }
     }
-}
-void avx2caculatePartialMatrix(int *a_matrix, int *b_matrix, int *c_matrix, int n, int m, int l)
-{
-    for (int i = 0; i < n; i++)
-    {
-                //printf("-------------new i %d\n",i);
-        for (int j = 0; j < l; j+=8)
-        {
-                //printf("-------------new j %d\n",j);
-            __m256i J_Index=  _mm256_setr_epi32(j,j+1,j+2,j+3,j+4,j+5,j+6,j+7);
-            __m256i J_Index_max =  _mm256_set1_epi32(l);
-            __m256i J_Index_mask = _mm256_cmpgt_epi32(J_Index_max,J_Index);
-            __m256i curPosValue =  _mm256_set1_epi32(0);
-            int curPosValue_test = 0;
-            for (int k = 0; k < m; k++)
-            {
-                /*
-            __m256i _m_b_matrix_index =  _mm256_setr_epi32(l*k,l*k,l*k,l*k,l*k,l*k,l*k,l*k);
-            __m256i _m_j = _mm256_setr_epi32(j,j+1,j+2,j+3,j+4,j+5,j+6,j+7);
-            _m_b_matrix_index =  _mm256_add_epi32(_m_b_matrix_index,_m_j);
-            */
-            //b_matrix[l * k + j];
-            __m256i _m_b_matrix_value = _mm256_maskload_epi32(&b_matrix[l*k+j],J_Index_mask);
-            #ifdef debug
-                printf("-------------new k %d\n",k);
-           printf("i:%d ,j:%d ,k%d\n",i,j,k);
-            printf("_m_b_matrix_value\n");
-            printM256i(&_m_b_matrix_value);
-            #endif
-
-            int a_matrix_value = a_matrix[i*m+k];
-            __m256i _m_a_matrix_value = _mm256_set1_epi32(a_matrix_value);
-            #ifdef debug
-            printf("_m_a_matrix_value\n");
-            printM256i(&_m_a_matrix_value);
-            #endif
-
-            __m256i tmp =  _mm256_mullo_epi32(_m_a_matrix_value,_m_b_matrix_value);
-            curPosValue  = _mm256_add_epi32(tmp,curPosValue);
-            #ifdef debug
-            printf("tmp\n");
-            printM256i(&tmp);
-            #endif
-                //curPosValue += a_matrix[i * m + k] * b_matrix[l * k + j];
-            }
-            #ifdef debug
-            printf("j_index_mask\n");
-            printM256i(&J_Index_mask);
-            printf("curPosValue\n");
-            printM256i(&curPosValue);
-            #endif
-            _mm256_maskstore_epi32 (&c_matrix[i*l+j],J_Index_mask,curPosValue);
-            //c_matrix[i * l + j] = curPosValue;
-        }
-    }
-}
-void printM256i(__m256i * avxValue)
-{
-   int * tmp = (int*)avxValue;
-   for (int i = 0; i < 8; i++)
-   {
-      printf(" i%d:%d ,",i,tmp[i]);
-   }
-   printf("\n");
 }
 // Remember to release your allocated memory
 void destruct_matrices(int *a_mat, int *b_mat)

@@ -1,6 +1,8 @@
 
+FLAGS=-mavx2  -Ofast
+
 all:main.cc matmul.c
-	mpicxx main.cc matmul.c -o matmul; 
+	mpicxx main.cc matmul.c -o matmul $(FLAGS); 
 run:	
 	mpirun -np 4 --map-by ppr:1:node  --hostfile hosts matmul < matdata
 
