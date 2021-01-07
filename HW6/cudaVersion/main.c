@@ -106,7 +106,7 @@ int main(int argc, char **argv)
    }
    minThread /= 4;
 
-   printf("\n[conv opencl]:\t\t[%.3f] ms\n\n", minThread * 1000);
+   printf("\n[conv Cuda]:\t\t[%.3f] ms\n\n", minThread * 1000);
 
    // Write the output image to file
    storeImage(outputImage, outputFile, imageHeight, imageWidth, inputFile);

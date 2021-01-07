@@ -6,11 +6,8 @@ CUDA_LINK_FLAGS =  -rdc=true -gencode=arch=compute_61,code=sm_61 -Xcompiler '-fP
 CUDA_COMPILE_FLAGS = --device-c -gencode=arch=compute_61,code=sm_61 -Xcompiler '-fPIC' -g -O3
 
 
-OBJS = main.o bmpfuncs.o hostFE.o serialConv.o helper.o
 cudaOBJS = mainCuda.o bmpfuncs.o kernelCuda.o serialConv.o helper.o
 
-conv: $(OBJS)
-	$(CC) -o $@ $(OBJS) $(FLAGS)
 convCuda: $(cudaOBJS)
 	nvcc -o $@ $^ $(CUDA_LINK_FLAGS) $(FLAGS)
 kernelCuda.o:kernelCuda.cu
@@ -21,4 +18,4 @@ kernelCuda.o:kernelCuda.cu
 
 
 clean:
-	rm -f conv *.o output.bmp ref.bmp
+	rm -f convCuda *.o output.bmp ref.bmp
