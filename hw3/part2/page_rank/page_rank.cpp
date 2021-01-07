@@ -27,6 +27,7 @@ void pageRank(Graph g, double *solution, double damping, double convergence)
   bool converged = false;
   double global_diff = 0;
   double *score_old = (double *)malloc(sizeof(double) * numNodes);
+#pragma omp parallel for
   for (int i = 0; i < numNodes; ++i)
   {
     score_old[i] = equal_prob;
@@ -34,17 +35,17 @@ void pageRank(Graph g, double *solution, double damping, double convergence)
 
   while (!converged)
   {
+    double out_zero_score = 0;
     global_diff = 0.0;
-    // compute score_new[vi] for all nodes vi:
-    #ifdef debug
-    printf("----- new iteration-----\n");
-    printf("old score\n");
-    for (int vi = 0; vi < num_nodes(g); vi++)
-    {
-      printf(" %d:%f", vi, score_old[vi]);
+#pragma omp parallel for reduction(+:out_zero_score)
+    for (int vi = 0; vi < num_nodes(g); vi++){
+      if (!outgoing_size(g, vi))
+      {
+        out_zero_score+=(damping * score_old[vi]) / numNodes;
+      }
     }
-    printf("\n");
-    #endif
+    // compute score_new[vi] for all nodes vi:
+#pragma omp parallel for reduction(+:global_diff) 
     for (int vi = 0; vi < num_nodes(g); vi++)
     {
       solution[vi] = 0.0;
@@ -56,65 +57,17 @@ void pageRank(Graph g, double *solution, double damping, double convergence)
         if (outgoing_size(g, *vj))
         {
           solution[vi] += (score_old[*vj] / (double)outgoing_size(g, *vj));
-          #ifdef debug
-          printf("-----------change in ------- \n ");
-          printf("in vertex %d \n",*vj);
-          printf("score old %f outgoing size %d\n", score_old[*vj] , outgoing_size(g, *vj));
-          printf("solution[vi] += score_old[*vj] / outgoing_size(g, *vj)]\n");
-          for (int vi = 0; vi < num_nodes(g); vi++)
-          {
-            printf(" %d:%f", vi, solution[vi]);
-          }
-          printf("-----------change in end------- \n ");
-          #endif
         }
       }
-      solution[vi] = (damping * solution[vi]) + ((1.0 - damping) /numNodes);
+      solution[vi] =out_zero_score+ (damping * solution[vi]) + ((1.0 - damping) /numNodes);
       //solution[vi] = (damping * solution[vi]) + (1.0 - damping) numNodes;
-      #ifdef debug
-      printf("-----------change middle ------- \n ");
-      printf("solution[vi] = (damping * solution[vi]) + (1.0 - damping) / numNodes;\n");
-      printf("damping*solution:%f,1-damping/numofnode%f ", (damping * solution[vi]) , (1.0 - damping) / numNodes);
-      printf("middle solution\n");
-      for (int vi = 0; vi < num_nodes(g); vi++)
-      {
-        printf(" %d:%f", vi, solution[vi]);
-      }
-      
-      printf("\n-----------change middle end------- \n ");
-      #endif
-      for (const Vertex *vj = start; vj != end; vj++)
-      {
-        if (!outgoing_size(g, *vj))
-        {
-          solution[vi] += (damping * score_old[*vj]) / numNodes;
-          #ifdef debug
-          printf("-----------change below ------- \n ");
-          printf("in vertex %d \n",*vj);
-          printf("damping %f,score old %f, numNodes %d\n",damping, score_old[*vj] , numNodes);
-          for (int vi = 0; vi < num_nodes(g); vi++)
-          {
-            printf(" %d:%f", vi, solution[vi]);
-          }
-          printf("-----------change below end------- \n ");
-          #endif
-        }
-      }
 
       global_diff += abs(solution[vi] - score_old[vi]);
-      #ifdef debug
-      printf("global_diff %f , solution[vi] %f, score_old[vi] %f\n",global_diff,solution[vi],score_old[vi]);
-      #endif
-      score_old[vi] = solution[vi];
     }
-    #ifdef debug
-    printf("solution\n");
-    for (int vi = 0; vi < num_nodes(g); vi++)
-    {
-      printf(" %d:%f", vi, solution[vi]);
+#pragma omp parallel for
+    for (int vi = 0; vi < num_nodes(g); vi++){
+        score_old[vi] = solution[vi];
     }
-    printf("\n");
-    #endif
     converged = (global_diff < convergence);
   }
   free(score_old);
